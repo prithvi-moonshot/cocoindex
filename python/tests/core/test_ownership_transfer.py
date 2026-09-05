@@ -115,7 +115,7 @@ def test_ownership_transfer_basic() -> None:
     app.update_blocking()
     assert GlobalDictTarget.store.data["x"].data == 1
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C1",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C1",
     }
     GlobalDictTarget.store.metrics.collect()
 
@@ -125,7 +125,7 @@ def test_ownership_transfer_basic() -> None:
     app.update_blocking()
     assert GlobalDictTarget.store.data["x"].data == 2
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C2",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C2",
     }
 
 
@@ -152,7 +152,7 @@ def test_ownership_transfer_same_value() -> None:
     # Final state must still be 1, regardless of whether preempt or delete+insert happened.
     assert GlobalDictTarget.store.data["x"].data == 1
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C2",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C2",
     }
 
 
@@ -212,7 +212,7 @@ def test_ownership_transfer_ordering_independence() -> None:
     assert "x" in GlobalDictTarget.store.data
     assert GlobalDictTarget.store.data["x"].data == 2
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C2",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C2",
     }
 
 
@@ -252,7 +252,7 @@ async def test_concurrent_claimant_sees_owner_during_sink_apply() -> None:
             _concurrent_claim_store.wait_for_blocked_apply(), timeout=5.0
         )
         assert await common.list_target_state_owners(app) == {
-            '/@test_target_state/concurrent_claim/"x"': coco.ROOT_PATH / "C2",
+            '/@"test_target_state/concurrent_claim"/"x"': coco.ROOT_PATH / "C2",
         }
 
         # Let C3 enter submission while C2 is still in sink.apply. The current
@@ -269,7 +269,7 @@ async def test_concurrent_claimant_sees_owner_during_sink_apply() -> None:
 
     assert _concurrent_claim_store.data["x"].data == 3
     assert await common.list_target_state_owners(app) == {
-        '/@test_target_state/concurrent_claim/"x"': coco.ROOT_PATH / "C3",
+        '/@"test_target_state/concurrent_claim"/"x"': coco.ROOT_PATH / "C3",
     }
 
 
@@ -300,8 +300,8 @@ def test_ownership_transfer_multiple_keys() -> None:
     assert GlobalDictTarget.store.data["a"].data == 3
     assert GlobalDictTarget.store.data["b"].data == 2
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"a"': coco.ROOT_PATH / "C2",
-        '/@test_target_state/global_dict/"b"': coco.ROOT_PATH / "C1",
+        '/@"test_target_state/global_dict"/"a"': coco.ROOT_PATH / "C2",
+        '/@"test_target_state/global_dict"/"b"': coco.ROOT_PATH / "C1",
     }
 
 
@@ -320,7 +320,7 @@ def test_ownership_transfer_chain() -> None:
     app.update_blocking()
     assert GlobalDictTarget.store.data["x"].data == 1
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C1",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C1",
     }
 
     # Run 2: C1 gone, C2 takes over
@@ -329,7 +329,7 @@ def test_ownership_transfer_chain() -> None:
     app.update_blocking()
     assert GlobalDictTarget.store.data["x"].data == 2
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C2",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C2",
     }
 
     # Run 3: C2 gone, C3 takes over
@@ -338,7 +338,7 @@ def test_ownership_transfer_chain() -> None:
     app.update_blocking()
     assert GlobalDictTarget.store.data["x"].data == 3
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C3",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C3",
     }
 
 
@@ -385,7 +385,7 @@ def test_ownership_transfer_preempt_strict() -> None:
     # Should be 1 upsert (update), NOT a delete + insert
     assert GlobalDictTarget.store.metrics.collect() == {"sink": AtMost(1), "upsert": 1}
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C2",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C2",
     }
 
     # Run 3: Same value transfer — no action needed
@@ -397,7 +397,7 @@ def test_ownership_transfer_preempt_strict() -> None:
     }
     assert GlobalDictTarget.store.metrics.collect() == {}
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C3",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C3",
     }
 
 
@@ -417,7 +417,7 @@ def test_component_delete_cleans_inverted_tracking() -> None:
     _source_data["C1"] = {"x": 1}
     app.update_blocking()
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C1",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C1",
     }
     GlobalDictTarget.store.metrics.collect()
 
@@ -436,7 +436,7 @@ def test_component_delete_cleans_inverted_tracking() -> None:
         "x": DictDataWithPrev(data=2, prev=[], prev_may_be_missing=True),
     }
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C2",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C2",
     }
 
 
@@ -491,7 +491,7 @@ def test_ownership_transfer_sink_failure_then_retry() -> None:
     assert GlobalDictTarget.store.metrics.collect() == {}
     # The `__target` claim landed at precommit, ahead of the failed sink apply.
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C2",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C2",
     }
 
     # Run 3: retry with a healthy sink. C2 finds "x" in its own tracking with
@@ -504,7 +504,7 @@ def test_ownership_transfer_sink_failure_then_retry() -> None:
     }
     assert GlobalDictTarget.store.metrics.collect() == {"sink": AtMost(1), "upsert": 1}
     assert common.list_target_state_owners_sync(app) == {
-        '/@test_target_state/global_dict/"x"': coco.ROOT_PATH / "C2",
+        '/@"test_target_state/global_dict"/"x"': coco.ROOT_PATH / "C2",
     }
 
 
