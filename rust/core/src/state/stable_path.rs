@@ -284,13 +284,18 @@ fn fmt_path_part(key: &StableKey, f: &mut std::fmt::Formatter<'_>) -> std::fmt::
     }
 }
 
-/// A symbol that a path writes as `@name`: printable ASCII with none of the
-/// characters that end a key or start a quote.
+/// A symbol that a path writes as `@name`: printable ASCII or letters and
+/// digits in any script, with none of the characters that end a key or start
+/// a quote. Symbols come from Python identifiers (`mount(fn)` uses
+/// `fn.__name__`), which may be non-ASCII; none of the delimiters is
+/// alphanumeric, so the grammar stays unambiguous.
 fn is_bare_symbol(s: &str) -> bool {
     !s.is_empty()
         && !s.starts_with('"')
-        && s.chars()
-            .all(|c| c.is_ascii_graphic() && !matches!(c, '/' | ',' | '[' | ']' | '\\'))
+        && s.chars().all(|c| {
+            (c.is_ascii_graphic() || c.is_alphanumeric())
+                && !matches!(c, '/' | ',' | '[' | ']' | '\\')
+        })
 }
 
 impl<'a> From<&'a [StableKey]> for StablePathRef<'a> {
@@ -785,6 +790,29 @@ mod tests {
         }
         let path = StablePath(Arc::from(keys));
         assert_eq!(StablePath::from_str(&path.to_string()).unwrap(), path);
+    }
+
+    /// Non-ASCII identifiers print as bare symbols, and characters that aren't
+    /// letters or digits still get quoted.
+    #[test]
+    fn non_ascii_symbol_names_print_bare() {
+        use std::str::FromStr;
+        let bare = StablePath(Arc::from(vec![StableKey::Symbol(Arc::from("处理"))]));
+        assert_eq!(bare.to_string(), "/@处理");
+        assert_eq!(StablePath::from_str("/@处理").unwrap(), bare);
+
+        for name in ["处 理", "a\u{3000}b", "x\u{200d}y"] {
+            let key = StableKey::Symbol(Arc::from(name));
+            let text = StablePath(Arc::from(vec![key.clone()])).to_string();
+            assert!(
+                text.starts_with("/@\""),
+                "{name:?} should be quoted: {text}"
+            );
+            assert_eq!(
+                StablePath::from_str(&text).unwrap(),
+                StablePath(Arc::from(vec![key]))
+            );
+        }
     }
 
     use super::*;
