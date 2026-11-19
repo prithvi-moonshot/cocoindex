@@ -695,6 +695,98 @@ mod tests {
             assert!(StablePath::from_str(text).is_err(), "{text}");
         }
     }
+
+    /// One key of every `StableKey` variant, including cross-type twins whose
+    /// *values* spell another variant's rendering.
+    fn representative_keys() -> Vec<StableKey> {
+        let uuid = uuid::Uuid::from_bytes([3u8; 16]);
+        let fp = utils::fingerprint::Fingerprint([7u8; 16]);
+        vec![
+            StableKey::Null,
+            StableKey::Bool(true),
+            StableKey::Bool(false),
+            StableKey::Int(0),
+            StableKey::Int(13),
+            StableKey::Int(-42),
+            StableKey::Int(i64::MIN),
+            StableKey::Int(i64::MAX),
+            StableKey::Str(Arc::from("rfc8259.md")),
+            // Strings that would break a naive split on '/' or on quotes.
+            StableKey::Str(Arc::from("a/b/c")),
+            StableKey::Str(Arc::from("with \"quotes\" and \\ backslash")),
+            StableKey::Str(Arc::from("nul\0and\ttabs\n")),
+            StableKey::Str(Arc::from("café ☕")),
+            StableKey::Str(Arc::from("")),
+            // Strings whose text is exactly some other variant's rendering.
+            StableKey::Str(Arc::from("null")),
+            StableKey::Str(Arc::from("true")),
+            StableKey::Str(Arc::from("13")),
+            StableKey::Str(Arc::from("@process_files")),
+            StableKey::Str(Arc::from("[13,null]")),
+            StableKey::Str(Arc::from(fp.to_string())),
+            StableKey::Str(Arc::from(uuid.to_string())),
+            StableKey::Bytes(Arc::from(&b"bytes\x00with\x01escapes/and\"quote"[..])),
+            // Bytes whose text is a string key's rendering.
+            StableKey::Bytes(Arc::from(&b"13"[..])),
+            StableKey::Bytes(Arc::from(&b""[..])),
+            StableKey::Uuid(uuid),
+            StableKey::Fingerprint(fp),
+            StableKey::Symbol(Arc::from("process_files")),
+            // Symbols whose name is another variant's rendering.
+            StableKey::Symbol(Arc::from("null")),
+            StableKey::Symbol(Arc::from("true")),
+            StableKey::Symbol(Arc::from("13")),
+            StableKey::Symbol(Arc::from("\"quoted\"")),
+            // Symbols carrying '/' must stay one part.
+            StableKey::Symbol(Arc::from("cocoindex/mount_target")),
+            // Python identifiers can be non-ASCII.
+            StableKey::Symbol(Arc::from("处理")),
+            StableKey::Symbol(Arc::from("")),
+            StableKey::Array(Arc::from([])),
+            StableKey::Array(Arc::from([
+                StableKey::Int(13),
+                StableKey::Str(Arc::from("a,b]c/d")),
+                StableKey::Symbol(Arc::from("sys/state")),
+                StableKey::Array(Arc::from([
+                    StableKey::Null,
+                    StableKey::Bytes(Arc::from(&b"\0"[..])),
+                ])),
+            ])),
+            // An array whose rendering a naive parser could confuse with the
+            // single string key that spells the same text.
+            StableKey::Array(Arc::from([StableKey::Int(13), StableKey::Null])),
+        ]
+    }
+
+    /// No two distinct keys may render to the same path text; otherwise a
+    /// printed path can't be read back unambiguously, whatever the parser does.
+    #[test]
+    fn path_part_renderings_do_not_collide() {
+        let mut seen: std::collections::HashMap<String, StableKey> = Default::default();
+        for key in representative_keys() {
+            let rendered = StablePath(Arc::from(vec![key.clone()])).to_string();
+            if let Some(other) = seen.insert(rendered.clone(), key.clone()) {
+                panic!("{other:?} and {key:?} both render as {rendered}");
+            }
+        }
+    }
+
+    /// Every key, alone and all together, parses back from its rendering.
+    #[test]
+    fn every_key_parses_back_from_its_display() {
+        use std::str::FromStr;
+        let keys = representative_keys();
+        for key in &keys {
+            let path = StablePath(Arc::from(vec![key.clone()]));
+            let text = path.to_string();
+            let parsed = StablePath::from_str(&text)
+                .unwrap_or_else(|e| panic!("parse {text:?} failed: {e}"));
+            assert_eq!(parsed, path, "{text}");
+        }
+        let path = StablePath(Arc::from(keys));
+        assert_eq!(StablePath::from_str(&path.to_string()).unwrap(), path);
+    }
+
     use super::*;
     use std::io::Cursor;
 
