@@ -298,6 +298,15 @@ fn is_bare_symbol(s: &str) -> bool {
         })
 }
 
+/// One key as a path writes it (see [`fmt_path_part`]).
+struct PathPart<'a>(&'a StableKey);
+
+impl std::fmt::Display for PathPart<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt_path_part(self.0, f)
+    }
+}
+
 impl<'a> From<&'a [StableKey]> for StablePathRef<'a> {
     fn from(value: &'a [StableKey]) -> Self {
         StablePathRef(value)
@@ -499,9 +508,13 @@ impl<'t> KeyParser<'t> {
                         } else if let Ok(u) = uuid::Uuid::parse_str(token) {
                             Ok(StableKey::Uuid(u))
                         } else {
+                            // Spell both suggestions the way a path prints
+                            // them, so each one parses whatever the token holds.
                             Err(self.error(&format!(
-                                "`{token}` is not a key (quote a string, as in `\"{token}\"`, \
-                                 and write a symbol as `@{token}`)"
+                                "`{token}` is not a key (quote a string, as in `{}`, \
+                                 and write a symbol as `{}`)",
+                                PathPart(&StableKey::Str(Arc::from(token))),
+                                PathPart(&StableKey::Symbol(Arc::from(token))),
                             )))
                         }
                     }
@@ -815,6 +828,29 @@ mod tests {
         }
     }
 
+    /// The parse error suggests a string and a symbol spelling of the token,
+    /// and each suggestion parses to that key, whatever the token holds.
+    #[test]
+    fn parse_error_hints_are_valid_input() {
+        use std::str::FromStr;
+        for token in ["process_files", "my file.md", "a\"b", "处理"] {
+            let err = StablePath::from_str(&format!("/{token}"))
+                .unwrap_err()
+                .to_string();
+            for key in [
+                StableKey::Str(Arc::from(token)),
+                StableKey::Symbol(Arc::from(token)),
+            ] {
+                let hint = PathPart(&key).to_string();
+                assert!(err.contains(&format!("`{hint}`")), "{hint} not in: {err}");
+                assert_eq!(
+                    StablePath::from_str(&format!("/{hint}")).unwrap(),
+                    StablePath(Arc::from(vec![key])),
+                    "suggested {hint} doesn't parse back"
+                );
+            }
+        }
+    }
     use super::*;
     use std::io::Cursor;
 
